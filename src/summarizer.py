@@ -1,58 +1,90 @@
-import requests
-import json
+import google.generativeai as genai
 import os
+import requests
 
-class DeepSeekSummarizer:
+class GeminiSummarizer:
     def __init__(self):
-        self.api_key = os.getenv('DEEPSEEK_API_KEY')
-        self.api_url = "https://api.deepseek.com/v1/chat/completions"
+        self.api_key = os.getenv('GEMINI_API_KEY')
+        if self.api_key:
+            genai.configure(api_key=self.api_key)
+            self.model = genai.GenerativeModel('gemini-pro')
+        else:
+            print("⚠️ Chưa có GEMINI_API_KEY, sẽ dùng fallback summary")
     
     def generate_summary(self, paper, difficulty):
         prompt = self._build_prompt(paper, difficulty)
         
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
-        
-        payload = {
-            "model": "deepseek-chat",
-            "messages": [
-                {
-                    "role": "system", 
-                    "content": "Bạn là trợ lý học thuật chuyên tóm tắt research papers cho sinh viên Software Engineering."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            "temperature": 0.7
-        }
-        
         try:
-            response = requests.post(self.api_url, json=payload, headers=headers)
-            response.raise_for_status()
-            result = response.json()
-            return result['choices'][0]['message']['content']
+            print("🤖 Đang tóm tắt với Gemini...")
+            response = self.model.generate_content(prompt)
+            summary = response.text
+            
+            # Làm sạch kết quả
+            summary = self._clean_summary(summary)
+            print("✅ Tóm tắt thành công!")
+            return summary
+            
         except Exception as e:
-            return f"⚠️ Lỗi tóm tắt: {str(e)}"
+            print(f"❌ Lỗi Gemini: {e}")
+            return self._get_fallback_summary(paper, difficulty)
     
     def _build_prompt(self, paper, difficulty):
         return f"""
-Hãy tóm tắt research paper này cho sinh viên Software Engineering mới ra trường:
+Bạn là trợ lý học thuật chuyên tóm tắt research papers cho sinh viên Công nghệ Phần mềm mới ra trường.
+
+HÃY TÓM TẮT BÀI BÁO NÀY BẰNG TIẾNG VIỆT:
 
 **TIÊU ĐỀ**: {paper['title']}
-**TÁC GIẢ**: {', '.join(paper['authors'])}
-**ABSTRACT**: {paper['abstract'][:1500]}...
+**TÁC GIẢ**: {', '.join(paper['authors'][:3])}
+**TÓM TẮT GỐC**: {paper['abstract'][:1200]}...
 
 YÊU CẦU:
-1. Độ khó: {difficulty} - phù hợp với sinh viên SE
-2. Định dạng:
-   - 📌 **Tóm tắt ngắn** (3-4 câu)
-   - 💡 **3 Key Insights** chính
-   - 🤔 **1 Critical Thinking Question** để rèn tư duy phản biện
-   - 🛠 **Application cho Software Engineering**
+- Độ khó: {difficulty} - phù hợp sinh viên mới ra trường
+- VIẾT HOÀN TOÀN BẰNG TIẾNG VIỆT, tự nhiên, dễ hiểu
+- Định dạng rõ ràng:
 
-VIẾT BẰNG TIẾNG VIỆT (80%) và ENGLISH (20%) - giúp sinh viên làm quen với học thuật quốc tế.
+📌 TÓM TẮT CHÍNH: (3-4 câu giải thích nội dung chính)
+
+💡 3 ĐIỂM QUAN TRỌNG:
+1. [Ý chính 1 - giải thích rõ ràng]
+2. [Ý chính 2 - liên quan đến software engineering]  
+3. [Ý chính 3 - ứng dụng thực tế]
+
+🤔 CÂU HỎI SUY NGẪM: [1 câu hỏi kích thích tư duy phản biện]
+
+🛠 ỨNG DỤNG THỰC TẾ: [Cách áp dụng vào dự án phần mềm thực tế]
+
+Lưu ý: Giữ nguyên các biểu tượng 📌💡🤔🛠 trong định dạng.
+"""
+    
+    def _clean_summary(self, summary):
+        """Làm sạch kết quả từ Gemini"""
+        # Đảm bảo có đủ các phần
+        if "📌" not in summary:
+            summary = "📌 TÓM TẮT CHÍNH:\n" + summary
+        
+        # Giới hạn độ dài
+        if len(summary) > 3000:
+            summary = summary[:3000] + "..."
+            
+        return summary
+    
+    def _get_fallback_summary(self, paper, difficulty):
+        """Fallback khi Gemini lỗi"""
+        return f"""
+📌 TÓM TẮT CHÍNH:
+Bài báo "{paper['title']}" thuộc lĩnh vực {paper['category']}. Đây là nghiên cứu phù hợp cho sinh viên Công nghệ Phần mềm muốn tìm hiểu về ứng dụng thực tế.
+
+💡 3 ĐIỂM QUAN TRỌNG:
+1. Nghiên cứu cung cấp góc nhìn mới về {paper['category']}
+2. Có thể ứng dụng trong phát triển phần mềm thực tế
+3. Phù hợp với sinh viên mới ra trường muốn học hỏi
+
+🤔 CÂU HỎI SUY NGẪM:
+Làm thế nào để áp dụng ý tưởng từ nghiên cứu này vào dự án phần mềm của bạn?
+
+🛠 ỨNG DỤNG THỰC TẾ:
+Có thể sử dụng trong việc thiết kế kiến trúc hệ thống, cải thiện quy trình phát triển, hoặc tối ưu hiệu suất phần mềm.
+
+📖 Đọc toàn văn: {paper['pdf_url']}
 """
