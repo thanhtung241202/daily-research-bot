@@ -1,9 +1,8 @@
 name: Daily Research Email
 on:
   schedule:
-    # 8:00 AM Vietnam Time từ Thứ 2 đến Thứ 6 (UTC+7 = UTC+1)
-    - cron: '0 1 * * 1-5'  # 1:00 UTC = 8:00 Vietnam (Thứ 2-6)
-  workflow_dispatch:  # Cho phép chạy thủ công
+    - cron: '0 1 * * 1-5'
+  workflow_dispatch:
 
 jobs:
   send-research-email:
@@ -20,22 +19,26 @@ jobs:
           
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
-          pip install google-generativeai
+          pip install feedparser requests fpdf2 python-dotenv beautifulsoup4 google-generativeai
           
-      - name: Run Research Pipeline
+      - name: Debug Secrets
+        run: |
+          echo "Secrets check:"
+          echo "GEMINI length: ${#GEMINI_API_KEY}"
+          echo "SENDER_EMAIL: $SENDER_EMAIL"
+          echo "RECEIVER_EMAIL: $RECEIVER_EMAIL"
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+          SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
+          RECEIVER_EMAIL: ${{ secrets.RECEIVER_EMAIL }}
+          
+      - name: Run Pipeline
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
           SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
           RECEIVER_EMAIL: ${{ secrets.RECEIVER_EMAIL }}
         run: |
-          python src/main.py
-          
-      - name: Upload logs on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: error-logs
-          path: data/
-          retention-days: 5
+          cd src
+          python main.py
