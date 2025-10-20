@@ -1,11 +1,8 @@
-# Sửa file requirements.txt thành:
-cat > requirements.txt << 'EOF'
+# Thêm google-generativeai vào requirements
+
 feedparser>=6.0.0
 requests>=2.31.0
 fpdf2>=2.7.4
 python-dotenv>=1.0.0
 beautifulsoup4>=4.12.2
-EOF
-
-# Sau đó cài lại
-pip3 install -r requirements.txt
+google-generativeai>=0.3.0
